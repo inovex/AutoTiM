@@ -1,0 +1,57 @@
+version: "3.9"
+services:
+  mlflow:
+    container_name: mlflow
+    build: ./mlflow/.
+    image: "mlflow"
+    depends_on:
+      - "db"
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./.env/mlflow.env
+    volumes:
+      - mlflow_data_artifact:/mnt/persistent-disk/artifact
+    command: mlflow server --backend-store-uri postgresql://mlflow:password@db:5432/mlflow --default-artifact-root /mnt/persistent-disk/artifact --host 0.0.0.0
+  AutoTiM:
+    image: "autotim:1.0"
+    build: "../../."
+    container_name: AutoTiM
+    environment:
+      - AUTOTIM_USERNAME=admin
+      - AUTOTIM_PASSWORD=password
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    env_file:
+      - ./.env/AutoTiM.env
+    volumes:
+      - autotim-data:/mnt/persistent-disk/data
+      - mlflow_data_artifact:/mnt/persistent-disk/artifact
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:  
+      - "5004:5004"
+  db:
+    image: postgres:11
+    #restart: always
+    container_name: postgres_db
+    environment:
+      - POSTGRES_DB=mlflow
+      - POSTGRES_USER=mlflow
+      - POSTGRES_PASSWORD=password
+    env_file:
+      - ./.env/postgres.env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-d", "mlflow", "-U", "mlflow"]
+      interval: 3s
+      timeout: 1s
+      retries: 5
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres_data:
+  mlflow_data_artifact:
+  autotim-data:

@@ -1,0 +1,2 @@
+mlflow==1.30.0
+protobuf~=3.19.5
