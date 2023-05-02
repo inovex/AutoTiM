@@ -8,7 +8,7 @@ This Python application was developed as part of the [Service-Meister project](h
 
 This project is part of the collaboration between [KROHNE Messtechnik GmbH](https://de.krohne.com/de/) and [inovex GmbH](https://www.inovex.de/de/) within the [Service-Meister research project](https://www.servicemeister.org/).
 
-Contact: andre.ebert@inovex.de
+Contact: https://www.inovex.de/de/kontakt/
 
 
 
