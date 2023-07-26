@@ -20,13 +20,3 @@ def get_single_file_input_format(request, allowed_extensions):
     if allowed_file(filename=file.filename, allowed_extensions=allowed_extensions):
         return file
     return None
-
-def read_timeseries_from_file(file):
-    try:
-        if file_extension(path=file.filename, extension='.csv'):
-            timeseries = pd.read_csv(file)
-        elif file_extension(path=file.filename, extension='.json'):
-            timeseries = pd.read_json(file)
-    except (AttributeError, ValueError):
-        timeseries = None
-    return timeseries

@@ -1,27 +1,18 @@
 import os
 
 import logging
-from pathlib import Path
-import glob
 import shutil
 
 import numpy as np
 import pandas as pd
 
-from flask import jsonify
-from flask_api import status
-
-from h2o.exceptions import H2OError, H2OServerError
-from mlflow.exceptions import MlflowException
+from h2o.exceptions import H2OServerError
 
 from autotim.feature_engineering.automated_feature_engineering import create_features, \
     select_relevant_features
-from autotim.feature_engineering.exceptions import FeatureCreationFailedError , \
-    DataSplitError
+from autotim.feature_engineering.exceptions import FeatureCreationFailedError
 
 from autotim.model_training.autotim_training import AutoTiMTrainer
-from autotim.storage_client.file_store_manager import FileStoreManager, \
-    DownloadFromStorageFailedError, StorageDoesNotExistError
 
 from autotim.model_selection.model_selection import ModelSelector
 from autotim.model_selection.exceptions import ModelSelectionFailed, \
@@ -56,14 +47,16 @@ def get_labels(dataframe: pd.DataFrame):
     return pd.Series(data=labels, index=ids)
 
 
-def train_test_split(dataframe: pd.DataFrame, train_size):
-    """Splits dataframe into train and test subset"""
+def train_test_split(dataset: pd.DataFrame, train_size:int):
+    """Splits dataset into train and test subset"""
 
-    ids = dataframe[os.getenv("COLUMN_ID")].unique()
+    ids = dataset[os.getenv("COLUMN_ID")].unique()
     np.random.shuffle(ids)
+
     train_ids = list(ids[:int(len(ids) * train_size)])
-    train_df = dataframe[dataframe[os.getenv("COLUMN_ID")].isin(train_ids)]
-    test_df = dataframe[~dataframe[os.getenv("COLUMN_ID")].isin(train_ids)]
+
+    train_df = dataset[dataset[os.getenv("COLUMN_ID")].isin(train_ids)]
+    test_df = dataset[~dataset[os.getenv("COLUMN_ID")].isin(train_ids)]
 
     X_train = train_df.drop(columns=[os.getenv("COLUMN_LABEL")])
     y_train = get_labels(train_df)
@@ -72,46 +65,15 @@ def train_test_split(dataframe: pd.DataFrame, train_size):
     return X_train, y_train, X_test, y_test
 
 
-def download_and_check_dataset(use_case_name: str, data_folder: str, bucket_dir: str,
-                               client: FileStoreManager):
-    dataset = None
-    response = 'ok', status.HTTP_200_OK
-    logging.debug(f"Downloading {bucket_dir} ...")
+def read_and_check_dataset(path: str):
+    logging.debug(f"Reading {path} ...")
 
-    try:
-        client.download_dir(output_path=data_folder, prefix=bucket_dir)
-        csv_files = glob.glob(
-            os.path.join(data_folder, bucket_dir, '*.csv'))
+    dataset = pd.read_csv(path)
 
-        if len(csv_files) > 1:
-            response = f"Your dataset directory '{bucket_dir}' contains multiple csv files " \
-                       "that can be used for training your model." \
-                       "This is an unexpected behavior. " \
-                       "Please reduce the number of csv files in this directory to one. " \
-                       "If you wish to store multiple datasets for your use case, please create" \
-                       f"a new subdirectory in '{use_case_name}/' for each csv file or use our " \
-                       f"/store-endpoint.", status.HTTP_406_NOT_ACCEPTABLE
-        else:
-            dataset = pd.read_csv(csv_files[0])
-
-            for key in ['COLUMN_ID', 'COLUMN_LABEL', 'COLUMN_VALUE', 'COLUMN_KIND']:
-                if os.getenv(key, "") != "" and not os.getenv(key) in dataset.columns:
-                    response = f"Dataset does not contain the column '{os.getenv(key)}' " \
-                               f"that was set as {key}", status.HTTP_406_NOT_ACCEPTABLE
-    except StorageDoesNotExistError as e:
-        response = "There has been an error connecting to storage: " + str(e), \
-                   status.HTTP_404_NOT_FOUND
-    except (DownloadFromStorageFailedError, FileNotFoundError) as e:
-        response = "Could not load your requested dataset. Did you upload it already? " + \
-                   str(e), status.HTTP_404_NOT_FOUND
-    except (UnicodeDecodeError, pd.errors.ParserError, MemoryError) as e:
-        response = "Could not read your dataset with pandas.read_csv: " + str(e), \
-                   status.HTTP_406_NOT_ACCEPTABLE
-    except AttributeError:
-        response = "Dataset was not loaded correctly. Cannot proceed with training", \
-                   status.HTTP_406_NOT_ACCEPTABLE
-
-    return dataset, response
+    for key in ['COLUMN_ID', 'COLUMN_LABEL', 'COLUMN_VALUE', 'COLUMN_KIND']:
+        if os.getenv(key, "") != "" and not os.getenv(key) in dataset.columns:
+            raise ValueError(f"Dataset does not contain the column '{os.getenv(key)}' that was set as {key}")
+    return dataset
 
 
 def extract_features(x_train, y_train):
@@ -158,15 +120,9 @@ def select_model(name, identifier, model_version, experiment_name, X_test, y_tes
     return old_metric, new_metric, warning
 
 
-def dataset_split(name, data_folder, file_client, evaluation_identifier, dataset, train_size):
+def dataset_split(path, evaluation_identifier, dataset, train_size):
     if evaluation_identifier is not None:
-        eval_data, eval_res = download_and_check_dataset(use_case_name=name,
-                                                         data_folder=data_folder,
-                                                         client=file_client,
-                                                         bucket_dir=f"{name}/"
-                                                                    f"{evaluation_identifier}/")
-        if eval_res[1] != status.HTTP_200_OK or eval_data is None:
-            raise DataSplitError(message=eval_res[0],status=eval_res[1])
+        eval_data = read_and_check_dataset(path)
 
         logging.debug("Train/Test Split ...")
         # pylint: disable=no-member
@@ -182,35 +138,18 @@ def dataset_split(name, data_folder, file_client, evaluation_identifier, dataset
     return x_train, x_test, y_train, y_test
 
 
-def train(name: str, identifier: str, file_client: FileStoreManager, train_size,
+def train(name: str, identifier: str, path: str, train_size,
           max_attempts, evaluation_identifier=None):
     """Run training for the given use case."""
-    data_folder = os.path.join(str(Path(__file__).parent.parent), 'data')
-    dataset, dataset_response = download_and_check_dataset(
-        use_case_name=name,
-        data_folder=data_folder,
-        client=file_client,
-        bucket_dir=f"{name}/{identifier}/")
+    dataset = read_and_check_dataset(path)
 
-    if dataset_response[1] != status.HTTP_200_OK:
-        return jsonify({'training': "failed",
-                        'error': dataset_response[0]}), dataset_response[1]
-
-    try:
-        x_train, x_test, y_train, y_test = \
-            dataset_split(name=name, data_folder=data_folder, file_client=file_client,
-                        evaluation_identifier=evaluation_identifier,
-                        dataset=dataset, train_size=train_size)
-    except DataSplitError as e:
-        return jsonify({'training': "failed",
-                            'error': e.message}), e.status
+    x_train, x_test, y_train, y_test = \
+        dataset_split(path=path,
+                    evaluation_identifier=evaluation_identifier,
+                    dataset=dataset, train_size=train_size)
 
     # Extract Features
-    try:
-        features_train = extract_features(x_train, y_train)
-    except FeatureCreationFailedError as e:
-        return jsonify({'training': "failed",
-                        'error': e.message}), status.HTTP_406_NOT_ACCEPTABLE
+    features_train = extract_features(x_train, y_train)
 
     warning = ''
     old_metric, new_metric = '', ''
@@ -222,14 +161,8 @@ def train(name: str, identifier: str, file_client: FileStoreManager, train_size,
                                                   attempt_model_creation)
 
         # Train Model
-        try:
-            experiment_name, model_version = train_model(
-                name, identifier, features_train, y_train)
-        except (H2OError, MlflowException) as e:
-            logging.error(e)
-            return jsonify({'training': "failed",
-                            'error': "Internal error during training occurred."}), \
-                status.HTTP_500_INTERNAL_SERVER_ERROR
+        experiment_name, model_version = train_model(
+            name, identifier, features_train, y_train)
 
         # Predict
         try:
@@ -250,17 +183,18 @@ def train(name: str, identifier: str, file_client: FileStoreManager, train_size,
         except RecursionError as e:
             logging.error(e)
             if attempt_model_creation == int(max_attempts) - 1:
-                return jsonify({'training': "failed",
+                return {'training': "failed",
                                 'error': "Internal error during training occurred." +
                                 "Please define the paramater max_attempts " +
                                 "from default '5' to an higer number " +
                                 "in your request. For more information " +
-                                "have a look into the README.md"}), \
-                    status.HTTP_500_INTERNAL_SERVER_ERROR
+                                "have a look into the README.md"}
             logging.warning(
                 "Too many features for model prediction. Retrain model with less features")
 
+    # TODO:
     # Clear data folder
+    data_folder = "data_test"
     if os.path.exists(data_folder):
         shutil.rmtree(data_folder)
 
@@ -271,5 +205,5 @@ def train(name: str, identifier: str, file_client: FileStoreManager, train_size,
                   f"is not encouraged. To guarantee that the desired model is set to " \
                   f"production, please do so manually."
 
-    return jsonify(merge_response_dict(versions=model_version,
-                                       warning=warning)), status.HTTP_200_OK
+    return merge_response_dict(versions=model_version,
+                                       warning=warning)
