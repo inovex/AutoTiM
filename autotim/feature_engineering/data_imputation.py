@@ -19,9 +19,10 @@ def fix_missing_data_points(df: pd.DataFrame, column_id: str, column_sort: str,
 
     group_by_col_names = [column_id]
     if column_kind is not None:
-        group_by_col_names.append(column_kind)
+        if len(column_kind) > 0:
+            group_by_col_names.append(column_kind)
+    tmp_df = tmp_df.sort_values(column_sort, ascending=True)
 
-    tmp_df = tmp_df.sort_values([column_sort], ascending=[True])
     return tmp_df.groupby(group_by_col_names).apply(lambda group: group.bfill().ffill())
 
 
@@ -79,4 +80,4 @@ def fix_missing_column_kind(ts_settings, timeseries, column_id: str, column_kind
                                      value_col_name=column_value)
         timeseries = pd.concat([timeseries, pd_enriched])
 
-    return  timeseries
+    return timeseries

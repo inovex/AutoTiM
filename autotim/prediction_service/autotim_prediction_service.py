@@ -12,7 +12,7 @@ from autotim.prediction_service.autotim_model import AutoTiM_Model
 from autotim.prediction_service.mlflow_model_loader import MlFlowModelLoader
 
 
-mlflow.set_tracking_uri(uri=os.getenv('MLFLOW_TRACKING_URI'))
+mlflow.set_tracking_uri(uri=os.getenv('MLFLOW_TRACKING_URI', "http://localhost:5000"))
 
 
 class AutoTiMPredictionService:
@@ -29,12 +29,17 @@ class AutoTiMPredictionService:
     @staticmethod
     def predict(model, features):
         features = convert_h2oframe_to_numeric(features, features.columns)
-        result = model.predict(features).as_data_frame()['predict'].tolist()
 
-        return result
+        import sys
+        sys.setrecursionlimit(10000)  # got an recursion error locally
+
+        result = model.predict(features)
+        sys.setrecursionlimit(999)
+
+        return result.as_data_frame()['predict'].tolist()
 
     def get_model(self, use_case_name: str, dataset_identifier: str,
-                  model_version: int = None):
+                  model_version: int = None) -> AutoTiM_Model:
         stage = None if model_version is not None else 'Production'
 
         model_sceleton = AutoTiM_Model(use_case_name=use_case_name,

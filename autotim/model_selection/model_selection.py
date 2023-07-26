@@ -53,7 +53,7 @@ class ModelSelector:
     reset_prod_model_version = None # save production model version for the stage reset later
 
     def __init__(self, name, identifier, latest_model_version):
-        mlflow.set_tracking_uri(uri=os.getenv('MLFLOW_TRACKING_URI'))
+        mlflow.set_tracking_uri(uri=os.getenv('MLFLOW_TRACKING_URI', "http://localhost:5000"))
         self.client = mlflow.tracking.MlflowClient()
 
         self.experiment_name = name + '-' + identifier
@@ -71,13 +71,10 @@ class ModelSelector:
         if autotim_model.model is None:
             return {}
 
-        features = create_features(x_test, column_id=autotim_model.params.get('column_id'),
-                                   column_value=autotim_model.params.get(
-                                       'column_value'),
-                                   column_kind=autotim_model.params.get(
-                                       'column_kind'),
-                                   column_sort=autotim_model.params.get(
-                                       'column_sort'),
+        features = create_features(x_test, column_id=os.getenv("COLUMN_ID"),
+                                   column_value=os.getenv("COLUMN_VALUE"),
+                                   column_kind=os.getenv("COLUMN_KIND"),
+                                   column_sort=os.getenv("COLUMN_SORT"),
                                    settings=autotim_model.feature_settings)
 
         features = convert_h2oframe_to_numeric(features, features.columns)

@@ -15,7 +15,7 @@ from mlflow.tracking import MlflowClient
 
 
 class AutoTiMTrainer:
-    def __init__(self, experiment_name, model_name, tracking_uri=os.getenv('MLFLOW_TRACKING_URI')):
+    def __init__(self, experiment_name, model_name, tracking_uri=os.getenv('MLFLOW_TRACKING_URI', "http://localhost:5000")):
         try:
             h2o.init()
         except H2OServerError:
