@@ -12,15 +12,19 @@ RUN apt-get update \
     apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies RUN python -m pip install --upgrade pip
-RUN pip install poetry && pip cache purge
 
+# Create data directories if they don't exist
+RUN mkdir -p /data/inputs
+RUN mkdir -p /data/outputs
+
+COPY data/inputs/* /data/inputs/
 COPY autotim autotim
 COPY main.py main.py
 COPY pyproject.toml pyproject.toml
 COPY poetry.lock poetry.lock
-COPY data data
 
+# Install dependencies RUN python -m pip install --upgrade pip
+RUN pip install poetry && pip cache purge
 RUN poetry install --no-interaction --no-dev --no-root
 
 # set PYTHONPATH

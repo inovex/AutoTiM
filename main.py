@@ -1,22 +1,26 @@
 import os
 import pandas as pd
+import json
 
 from autotim.feature_engineering.automated_feature_engineering import create_features
 from autotim.app.endpoints.utils.model_creation_utils import train
 from autotim.prediction_service.autotim_prediction_service import AutoTiMPredictionService
 
 
-# read file
+# read data
 data_folder = "data"
-path = f"{data_folder}/data.csv"
-timeseries = pd.read_csv(f"{data_folder}/predict.csv")
+with open(f'{data_folder}/inputs/algoCustomData.json') as handle:
+    data_descr = json.loads(handle.read())
 
-# set params
+path_train = f"{data_folder}/inputs/{data_descr['train_file_name']}"
+timeseries_pred = pd.read_csv(f"{data_folder}/inputs/{data_descr['predict_file_name']}")
+
+# user params
 name="test"
 identifier="test"
-os.environ["COLUMN_LABEL"] = "label"
-os.environ["COLUMN_ID"] = "id"
-os.environ["COLUMN_SORT"] = "time"
+os.environ["COLUMN_LABEL"] = data_descr['target_column_name']
+os.environ["COLUMN_ID"] = data_descr['id_column_name']
+os.environ["COLUMN_SORT"] = data_descr['sorting_column_name']
 # os.environ["COLUMN_VALUE"] = None
 # os.environ["COLUMN_KIND"] = None
 
@@ -31,7 +35,7 @@ train_size = 0.6
 evaluation_identifier = None
 
 # training
-result = train(name=name, identifier=identifier, path=path, train_size=float(train_size),
+result = train(name=name, identifier=identifier, path=path_train, train_size=float(train_size),
              max_attempts=max_attempts,
              evaluation_identifier=evaluation_identifier)
 
@@ -46,7 +50,7 @@ autotim_model = autotim_prediction_service.get_model(use_case_name=use_case_name
                                                    dataset_identifier=dataset_identifier,
                                                    model_version=model_version)
 
-features = create_features(dataframe=timeseries, settings=autotim_model.feature_settings,
+features = create_features(dataframe=timeseries_pred, settings=autotim_model.feature_settings,
                            column_id=os.getenv("COLUMN_ID"),
                            column_value=os.getenv("COLUMN_VALUE"),
                            column_kind=os.getenv("COLUMN_KIND"),
