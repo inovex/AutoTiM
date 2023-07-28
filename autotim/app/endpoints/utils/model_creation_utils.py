@@ -191,12 +191,7 @@ def train(name: str, identifier: str, path: str, train_size,
                                 "have a look into the README.md"}
             logging.warning(
                 "Too many features for model prediction. Retrain model with less features")
-
-    # TODO:
-    # Clear data folder
-    data_folder = "data_test"
-    if os.path.exists(data_folder):
-        shutil.rmtree(data_folder)
+            raise RecursionError(e)
 
     if old_metric != "" and new_metric != "" and old_metric is not None and new_metric is not None \
             and old_metric != new_metric:

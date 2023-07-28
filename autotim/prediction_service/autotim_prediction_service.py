@@ -30,11 +30,8 @@ class AutoTiMPredictionService:
     def predict(model, features):
         features = convert_h2oframe_to_numeric(features, features.columns)
 
-        import sys
-        sys.setrecursionlimit(10000)  # got an recursion error locally
 
         result = model.predict(features)
-        sys.setrecursionlimit(999)
 
         return result.as_data_frame()['predict'].tolist()
 

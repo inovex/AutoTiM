@@ -5,6 +5,7 @@ import os
 import mlflow
 import numpy
 from matplotlib import pyplot as plt
+from pypdf import PdfMerger
 
 from sklearn.metrics import balanced_accuracy_score, precision_score, recall_score, \
     accuracy_score, confusion_matrix
@@ -18,6 +19,7 @@ from autotim.prediction_service.mlflow_model_loader import MlFlowModelLoader
 from autotim.model_selection.exceptions import MlflowExperimentNotFoundError, \
     MlflowModelNotFoundError, ModelSelectionFailed, ModelArtifactsNotAvailableError
 from autotim.model_selection.utils import is_better
+from autotim.model_selection.pdf_creation import MetricsReportPDF
 
 VALID_METRICS = ['accuracy',
                  'balanced_accuracy',
@@ -101,6 +103,31 @@ class ModelSelector:
         for key in metrics:
             self.client.log_metric(
                 run_id=autotim_model.run_id, key=key, value=metrics[key])
+
+        # create pdf
+        pdf_file_path = f"model_metrics_report.pdf"
+        logging.info(f"Write PDF file to {pdf_file_path}")
+        pdf = MetricsReportPDF(metrics, autotim_model.autotim_model_name)
+        pdf.set_general_components()
+        pdf.create_table_of_content()
+        pdf.create_metrics_table()
+        pdf.integrate_confusion_matrix(fig)
+        pdf.output(pdf_file_path)
+        # merge report with inovex description
+        pdfs = [pdf_file_path,
+                     os.path.join(os.path.dirname(__file__), "report_data/inovex_marketing_description.pdf")]
+
+        merger = PdfMerger()
+
+        for pdf in pdfs:
+            merger.append(pdf)
+
+        merged_pdf_path = f"{os.environ['data_folder']}/outputs/inovex_report.pdf"
+        merger.write(merged_pdf_path)
+        merger.close()
+        self.client.log_artifact(
+            run_id=autotim_model.run_id, local_path=merged_pdf_path, artifact_path="model_statistics")
+
         return metrics
 
     def metric_has_changed(self, metric: str) -> (bool, str):
