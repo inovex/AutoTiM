@@ -83,8 +83,8 @@ class MetricsReportPDF(FPDF):
         self.set_font("atkinson", "", 10)
         self.set_right_margin(20)
 
-        train_info = {"Anzahl Trainingsinstanzen": number_train_data,
-                      "Anzahl Feature": number_features}
+        train_info = {"Anzahl Trainingsdatenpunkte": number_train_data,
+                      "Anzahl Features": number_features}
         # create table
         with self.table(
                 width=80,

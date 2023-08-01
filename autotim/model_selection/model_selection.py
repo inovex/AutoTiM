@@ -43,7 +43,6 @@ def create_plot(y_test, conf_matrix):
     plt.yticks(fontsize=10)
     plt.xlabel('Predictions', fontsize=5 * math.sqrt(len(unique_labels)) + 5)
     plt.ylabel('Actual', fontsize=5 * math.sqrt(len(unique_labels)) + 5)
-    plt.title('Confusion Matrix', fontsize=5 * math.sqrt(len(unique_labels)) + 5)
     plt.tight_layout()
     return fig
 
