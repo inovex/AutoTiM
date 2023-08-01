@@ -10,6 +10,7 @@ import sys
 sys.setrecursionlimit(10000)
 
 # read data
+# TODO: change to /data
 data_folder = "data"
 os.environ["data_folder"] = data_folder
 with open(f'{data_folder}/inputs/algoCustomData.json') as handle:
@@ -19,8 +20,8 @@ path_train = f"{data_folder}/inputs/{data_descr['train_file_name']}"
 timeseries_pred = pd.read_csv(f"{data_folder}/inputs/{data_descr['predict_file_name']}")
 
 # user params
-name="autotim"
-identifier="automl"
+name="AutoTiM"
+identifier="AutoML"
 os.environ["COLUMN_LABEL"] = data_descr['target_column_name']
 os.environ["COLUMN_ID"] = data_descr['id_column_name']
 os.environ["COLUMN_SORT"] = data_descr['sorting_column_name']
@@ -69,4 +70,3 @@ with open(f'{data_folder}/outputs/predictions.json', 'w') as fp:
 
 print(preds)
 print("DONE")
-

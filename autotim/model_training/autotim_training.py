@@ -42,7 +42,7 @@ class AutoTiMTrainer:
         x_cols.remove(y_col)
         return train, x_cols, y_col
 
-    def log(self, model, num_features, feature_extraction_settings):
+    def log(self, model, num_train_instances, num_features, feature_extraction_settings):
         # Log model to MLFlow
         best_model = model.leader
         mlflow.h2o.log_model(best_model, self.model_name, registered_model_name=self.model_name)
@@ -54,6 +54,7 @@ class AutoTiMTrainer:
         # Log feature extraction settings to MLFlow
         mlflow.log_metric('number of extracted features', num_features)
         mlflow.log_params({
+            'number_of_training_instances': num_train_instances,
             'column_id': os.getenv("COLUMN_ID"),
             'column_value': os.getenv("COLUMN_VALUE"),
             'column_kind': os.getenv("COLUMN_KIND"),
@@ -87,6 +88,7 @@ class AutoTiMTrainer:
 
             # Log model and feature extraction settings to MLFlow
             num_features = len(features.columns)
+            num_train_instances = training_frame.nrows
             settings = tsfresh.feature_extraction.settings.from_columns(features)
-            version = self.log(aml, num_features, settings)
+            version = self.log(aml, num_train_instances, num_features, settings)
         return version

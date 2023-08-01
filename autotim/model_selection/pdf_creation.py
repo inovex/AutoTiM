@@ -24,9 +24,18 @@ class MetricsReportPDF(FPDF):
 
     def set_general_components(self):
         # add inovex font and color
-        self.add_font("atkinson", "", os.path.join(os.path.dirname(__file__), "Atkinson_Hyperlegible/AtkinsonHyperlegible-Regular.ttf"), uni=True)
-        self.add_font("atkinson", "B", os.path.join(os.path.dirname(__file__), "Atkinson_Hyperlegible/AtkinsonHyperlegible-Bold.ttf"), uni=True)
-        self.add_font("atkinson", "I", os.path.join(os.path.dirname(__file__), "Atkinson_Hyperlegible/AtkinsonHyperlegible-Italic.ttf"), uni=True)
+        self.add_font("atkinson", "",
+                      os.path.join(os.path.dirname(__file__), "Atkinson_Hyperlegible/AtkinsonHyperlegible-Regular.ttf"),
+                      uni=True)
+        self.add_font("atkinson", "B",
+                      os.path.join(os.path.dirname(__file__), "Atkinson_Hyperlegible/AtkinsonHyperlegible-Bold.ttf"),
+                      uni=True)
+        self.add_font("atkinson", "I",
+                      os.path.join(os.path.dirname(__file__), "Atkinson_Hyperlegible/AtkinsonHyperlegible-Italic.ttf"),
+                      uni=True)
+        self.add_font("atkinson", "BI",
+                      os.path.join(os.path.dirname(__file__), "Atkinson_Hyperlegible/AtkinsonHyperlegible-BoldItalic.ttf"),
+                      uni=True)
         self.set_text_color(5, 28, 89)
 
         # page setup
@@ -37,8 +46,11 @@ class MetricsReportPDF(FPDF):
 
         # add heading
         available_width = self._get_width()
-        self.cell(w=available_width, h=50, txt=f"Performance-Bericht für Modell {self.model_name}", new_x=XPos.LEFT,
-                  new_y=YPos.NEXT,
+        self.set_y(40)
+        self.cell(w=available_width, h=5, txt="Performance-Bericht für Modell", new_x=XPos.LEFT, new_y=YPos.NEXT,
+                  align="C")
+        self.set_font("atkinson", "BI", 20)
+        self.cell(w=available_width, h=20, txt=f"{self.model_name}", new_x=XPos.LEFT, new_y=YPos.NEXT,
                   align="C")
 
     def create_table_of_content(self):
@@ -48,9 +60,50 @@ class MetricsReportPDF(FPDF):
         self.cell(w=available_width, h=10, txt="Inhalt", new_x=XPos.LEFT, new_y=YPos.NEXT, align="L")
 
         self.set_font("atkinson", "", 10)
-        self.cell(h=10, txt="1.    Performance Metrics", new_x=XPos.LEFT, new_y=YPos.NEXT, align="L")
-        self.cell(w=available_width, h=5, txt="2.    Confusion Matrix", new_x=XPos.LEFT, new_y=YPos.NEXT,
+        self.cell(h=5, txt="1.    Übersicht Modelltraining", new_x=XPos.LEFT, new_y=YPos.NEXT, align="L")
+        self.cell(w=available_width, h=5, txt="2.    Performance-Kennzahlen", new_x=XPos.LEFT, new_y=YPos.NEXT,
                   align="L")
+        self.cell(w=available_width, h=5, txt="3.    Confusion Matrix", new_x=XPos.LEFT, new_y=YPos.NEXT,
+                  align="L")
+
+    def create_train_info_table(self, number_train_data, number_features):
+        self.set_text_color(5, 28, 89)
+        self.set_font("atkinson", "B", 12)
+
+        available_width = self._get_width()
+        half_available_width = available_width / 2
+        # add empty cell block
+        self.cell(w=available_width, h=10, new_x=XPos.LEFT, new_y=YPos.NEXT)
+        self.cell(w=(available_width / 2) - 20, h=20, txt="Übersicht Modelltraining", new_x=XPos.LEFT, new_y=YPos.NEXT,
+                  align="C")
+
+        self.image(os.path.join(os.path.dirname(__file__), "report_data/dumbbell.png"), x=half_available_width / 2, w=20)
+
+        self.set_text_color(0, 0, 0)
+        self.set_font("atkinson", "", 10)
+        self.set_right_margin(20)
+
+        train_info = {"Anzahl Trainingsinstanzen": number_train_data,
+                      "Anzahl Feature": number_features}
+        # create table
+        with self.table(
+                width=80,
+                align="RIGHT",
+                cell_fill_color=(244, 247, 255),
+                cell_fill_mode="ROWS",
+                col_widths=(30, 20),
+                text_align=("LEFT", "RIGHT"),
+                first_row_as_headings=False
+        ) as table:
+            self.set_y(120)
+            for metric, value in train_info.items():
+                row = table.row()
+                row.cell(metric)
+
+                if isinstance(value, str):
+                    row.cell(value)
+                else:
+                    row.cell(f"{value}")
 
     def create_metrics_table(self):
         self.set_text_color(5, 28, 89)
@@ -58,9 +111,10 @@ class MetricsReportPDF(FPDF):
 
         available_width = self._get_width()
         half_available_width = available_width / 2
+
         # add empty cell block
-        self.cell(w=available_width, h=20, new_x=XPos.LEFT, new_y=YPos.NEXT)
-        self.cell(w=(available_width / 2) - 20, h=20, txt="Performance Metrics", new_x=XPos.LEFT, new_y=YPos.NEXT,
+        self.cell(w=available_width, h=30, new_x=XPos.LEFT, new_y=YPos.NEXT)
+        self.cell(w=(available_width / 2) - 20, h=20, txt="Performance-Kennzahlen", new_x=XPos.LEFT, new_y=YPos.NEXT,
                   align="C")
 
         self.image(os.path.join(os.path.dirname(__file__), "report_data/speedometer.png"), x=half_available_width / 2, w=20)
@@ -72,8 +126,6 @@ class MetricsReportPDF(FPDF):
         updated_metrics = {"Metric": "Value"}
         updated_metrics.update(self.metrics)
 
-        self.set_right_margin(20)
-
         # create table
         with self.table(
                 width=80,
@@ -83,7 +135,7 @@ class MetricsReportPDF(FPDF):
                 col_widths=(30, 20),
                 text_align=("LEFT", "RIGHT"),
         ) as table:
-            self.set_y(120)
+            self.set_y(170)
             for metric, value in updated_metrics.items():
                 row = table.row()
                 row.cell(metric.replace("_", " "))
@@ -98,16 +150,17 @@ class MetricsReportPDF(FPDF):
         self.set_font("atkinson", "B", 12)
 
         available_width = self._get_width()
+
         # add empty cell block
-        self.cell(w=available_width, h=30, new_x=XPos.LEFT, new_y=YPos.NEXT)
+        self.cell(w=available_width, h=20, new_x=XPos.LEFT, new_y=YPos.NEXT)
 
         half_available_width = available_width / 2
-        self.cell(w=half_available_width - 20, h=20, txt="Confusion Matrix", border=0, new_x=XPos.LEFT, new_y=YPos.NEXT,
+        self.cell(w=half_available_width - 20, h=20, txt="Confusion Matrix", new_x=XPos.LEFT, new_y=YPos.NEXT,
                   align="C")
         self.image(os.path.join(os.path.dirname(__file__), "report_data/evaluation.png"), x=half_available_width / 2, w=20)
 
         fig = confusion_matrix_fig
         img_buf = BytesIO()
         plt.savefig(img_buf, format="svg")
-        self.image(img_buf, x=half_available_width + 27, y=180, w=75)
+        self.image(img_buf, x=half_available_width + 27, y=220, w=75)
         img_buf.close()

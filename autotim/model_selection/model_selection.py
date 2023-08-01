@@ -4,6 +4,7 @@ import math
 import os
 import mlflow
 import numpy
+from pprint import pprint
 from matplotlib import pyplot as plt
 from pypdf import PdfMerger
 
@@ -81,6 +82,12 @@ class ModelSelector:
 
         features = convert_h2oframe_to_numeric(features, features.columns)
         y_pre = autotim_model.model.predict(features)['predict'].as_data_frame()
+        num_features = self.client.get_metric_history(run_id=autotim_model.run_id, key="number of extracted features")
+        num_features = int(num_features[0].value)
+
+        run = mlflow.get_run(run_id=autotim_model.run_id)
+        params = run.data.params
+        num_train_data = params.get('number_of_training_instances')
 
         metrics = {
             'accuracy': accuracy_score(y_test, y_pre),
@@ -110,6 +117,7 @@ class ModelSelector:
         pdf = MetricsReportPDF(metrics, autotim_model.autotim_model_name)
         pdf.set_general_components()
         pdf.create_table_of_content()
+        pdf.create_train_info_table(num_train_data, num_features)
         pdf.create_metrics_table()
         pdf.integrate_confusion_matrix(fig)
         pdf.output(pdf_file_path)
