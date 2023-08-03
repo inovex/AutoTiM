@@ -9,9 +9,11 @@ from autotim.prediction_service.autotim_prediction_service import AutoTiMPredict
 import sys
 sys.setrecursionlimit(10000)
 
+import time
+start = time.time()
+
 # read data
-# TODO: change to /data
-data_folder = "data"
+data_folder = "/data"
 os.environ["data_folder"] = data_folder
 with open(f'{data_folder}/inputs/algoCustomData.json') as handle:
     data_descr = json.loads(handle.read())
@@ -33,13 +35,13 @@ os.environ["RECALL_AVERAGE"] = "micro"
 os.environ["METRIC"] = "accuracy"
 os.environ["MAX_FEATURES"] = "700"
 os.environ["FEATURES_DECREMENT"] = "0.9"
-os.environ["TRAIN_TIME"] = "dynamic"
+os.environ["TRAIN_TIME"] = "2"
 max_attempts = "3"
-train_size = 0.6
+train_size = "0.6"
 evaluation_identifier = None
 use_case_name = name
 dataset_identifier = identifier
-model_version = 1# can also be None
+model_version = None#"1"
 
 # training
 result = train(name=name, identifier=identifier, path=path_train, train_size=float(train_size),
@@ -62,11 +64,13 @@ features = create_features(dataframe=timeseries_pred, settings=autotim_model.fea
 prediction = autotim_prediction_service.predict(features=features,
                                                model=autotim_model.model)
 
-# TODO: check this!
 preds = {str(id): prediction[idx] for idx, id in enumerate(timeseries_pred["id"].unique())}
 
 with open(f'{data_folder}/outputs/predictions.json', 'w') as fp:
     json.dump(preds, fp)
 
-print(preds)
+# print(preds)
 print("DONE")
+
+end = time.time()
+print(f"This took {(end-start)/60} minutes")

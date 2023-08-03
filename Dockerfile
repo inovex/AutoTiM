@@ -17,11 +17,12 @@ RUN apt-get update \
 RUN mkdir -p /data/inputs
 RUN mkdir -p /data/outputs
 
-COPY data/inputs/* /data/inputs/
+#COPY data/inputs/* /data/inputs/
 COPY autotim autotim
 COPY main.py main.py
 COPY pyproject.toml pyproject.toml
 COPY poetry.lock poetry.lock
+COPY wrapper_script.sh wrapper_script.sh
 
 # Install dependencies RUN python -m pip install --upgrade pip
 RUN pip install poetry && pip cache purge
@@ -31,6 +32,4 @@ RUN poetry install --no-interaction --no-dev --no-root
 ENV PYTHONPATH /
 ENV PYTHONUNBUFFERED true
 
-#CMD poetry run python main.py
-COPY wrapper_script.sh wrapper_script.sh
 CMD poetry run bash wrapper_script.sh
