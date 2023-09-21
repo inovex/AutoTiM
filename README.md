@@ -1,14 +1,18 @@
 # AutoTiM
-> Train and store machine learning models for the classification of timeseries.
+> Train, store and use machine learning models for (multivariate) time series classification.
 
 ## About AutoTiM
 
-This Python application was developed as part of the [Service-Meister project](https://www.servicemeister.org/). The goal of AutoTiM is to train and store machine learning models for the classification of timeseries. Both training and feature engineering are fully automated. The user simply uploads a previously processed timeseries dataset via the */store* endpoint and can use the */train* endpoint to train a set of different model architectures from which the best performing model will be persisted. Finally, the user can test or use the model with the */predict* endpoint. (For more information on how to use this service, see the [Tutorial](#3-tutorial))
+This Python application was developed as part of the [Service-Meister project](https://www.servicemeister.org/). The goal of AutoTiM is to train, store and use machine learning models for (multivariate) time series classification. Both training and feature engineering are fully automated. The user simply uploads a previously processed time series dataset via the */store* endpoint and can use the */train* endpoint to train a set of different model architectures from which the best performing model will be persisted. Finally, the user can test or use the model with the */predict* endpoint. (For more information on how to use this service, see the [Tutorial](#3-tutorial))
 
 
-This project is part of the collaboration between [KROHNE Messtechnik GmbH](https://de.krohne.com/de/) and [inovex GmbH](https://www.inovex.de/de/) within the [Service-Meister research project](https://www.servicemeister.org/).
+This project is part of the collaboration between [KROHNE Messtechnik GmbH](https://de.krohne.com/en/) and [inovex GmbH](https://www.inovex.de/en/) within the [Service-Meister research project](https://www.servicemeister.org/).
 
-Contact: https://www.inovex.de/de/kontakt/
+Contact: https://www.inovex.de/en/contact-us/
+
+Paper: https://doi.org/10.1007/978-3-031-34107-6_21
+
+GitHub: https://github.com/inovex/AutoTiM
 
 
 
@@ -27,20 +31,20 @@ Contact: https://www.inovex.de/de/kontakt/
 
 ## 1. Setup and local execution
 
-For starting the local execution of the service, there is a `autotim/autotim/docker-compose.yml` which contains all the necessary services. 
+For starting the local execution of the service, there is a `autotim/autotim_execution/docker-compose.yml` which contains all the necessary services. 
 <br>
 
 
 ### Change Environment Variales (Optional)
 
-Configs can be changed in the `./autotim/autotim/.env` directory. Each service has a separate .env file. New environment variables can be easily added or existing ones modified. Mandatory variables are marked accordingly. 
+Configs can be changed in the `./autotim/autotim_execution/.env` directory. Each service has a separate .env file. New environment variables can be easily added or existing ones modified. Mandatory variables are marked accordingly. 
 
 
 > In some Docker alternatives (e.g. lima nerdctl), the inclusion of .env files does not work. In this case, the variables must be added directly in the docker-compose file under the respective server in the environment tab. 
 
 <br>
 
-If you want to use Google Cloud Platform in local execution for storage, you must store a `gcp-service.json` key. The template for this can be found at `autotim/autotim/.env/gcp-service.json.template`.
+If you want to use Google Cloud Platform in local execution for storage, you must store a `gcp-service.json` key. The template for this can be found at `autotim/autotim_execution/.env/gcp-service.json.template`.
 
 
 ### Setup local execution
@@ -49,13 +53,16 @@ If you want to use Google Cloud Platform in local execution for storage, you mus
 1. Install [**Docker-compose**](https://docs.docker.com/compose/) (or an equivalent). 
     > _The commercial usage of Docker is licensed._ (Find a suitable alternative for your OS, if using it commercially)
 
-2. Change directory into `./autotim/autotim`. 
+2. Change directory into `./autotim/autotim_execution`. 
 
 3. Build all necessary containers:
     ```shell
     docker-compose build
     ```
-
+    If you want to completely rebuild it, use:
+    ```shell
+    docker build --no-cache
+    ```
 ### Start local execution
 
 4. Start all services and volumes:
@@ -63,7 +70,7 @@ If you want to use Google Cloud Platform in local execution for storage, you mus
     docker-compose up 
     ```
    This will start 3 separate docker containers:
-   - AutoTiM service to `/store` datasets, `/train` models and generate `/predict`-ions for your new data;
+   - AutoTiM service to `/store` datasets, `/train` models and `/predict` on your new data;
    - MlFlow service to log models;
    - PostgreSQL database for the model metadata.
 
@@ -72,18 +79,20 @@ If you want to use Google Cloud Platform in local execution for storage, you mus
    | Service | Address               | Note                               |
    |---------|-----------------------|------------------------------------| 
    | AutoTiM  | http://localhost:5004 | username=admin , password=password |
-   | MlFlow  | http://0.0.0.0:5000   | localhost only works on Windows    |
-
+   | MlFlow  | http://localhost:5000   | if it does not work try: http://0.0.0.0:5000    |
 
 ### Reset local execution
 Each of the docker containers have a labeled docker volume to persist data between sessions. 
-To delete data and reinitialize your environment (execute these commands from the `./autotim/autotim/` directory):
-- stop all running containers
-- delete persisted volumes:
+To delete data and reinitialize your environment (execute these commands from the `./autotim/autotim_execution/` directory):
+
+stop all running containers:
+  ```bash
+  docker-compose down
+  ```
+stop all running containers and delete persisted volumes (data and models):
   ```bash
   docker-compose down --volumes
   ```
-
 <br> 
 
 ### (Extra feature) Start local execution with Google Cloud Storage (GCS)
@@ -95,7 +104,7 @@ The autotim service is compatible with the GCS (especially the Google buckets) i
 
 ![Architecture overview](doc/opensource_release/architecture.png)
 
-Our AutoTiM service provides the endpoints `/store`, `/train` and `/predict`. Datasets are stored in the local file system, trained models and associated metadata are logged via [MLFlow](https://mlflow.org/), a 3rd-party tool.
+Our AutoTiM service provides the endpoints `/store`, `/train` and `/predict`. Datasets are stored in the local file system (or GCS), trained models and associated metadata are logged via [MLFlow](https://mlflow.org/), a 3rd-party tool.
 
 ### 2.2 Endpoints
 For each of the three endpoints of the AutoTiM-Service this section provides:
@@ -136,19 +145,19 @@ The `/train`-endpoint uses a dataset previously uploaded via `/store`, performs 
 `dataset_identifier` (str): Name of the dataset within your project
 
 ##### Optional parameters
-`column_id`: Name of the id column, which assigns each row to a timeseries (default column name: id)<br>
+`column_id`: Name of the id column, which assigns each row to a time series (default column name: id)<br>
 `column_label`: Name of the column containing the classification labels (default: label)<br>
 `column_sort`: Name of the column that contains values which allow to sort the time series, e.g. time stamps (default: time)<br>
 `column_value`: Name of the column that contains the actual values of the time series, e.g. sensor data (default: None)<br>
-`column_kind`: Name of the column that indicates the names of the different timeseries types, e.g. different sensors (default: None)<br>
+`column_kind`: Name of the column that indicates the names of the different time series types, e.g. different sensors (default: None)<br>
 `train_size`: Proportion of the dataset to include in the train data when performing the train-test-split (default: 0.6)<br>
 `recall_average`: Metric to be used to calculate the recall and precision score (default: micro; possible metrics are: micro, macro, samples, weighted, binary or None)<br>
 `metric`: Metric to be used for the model selection (default: accuracy; possible metrics are: accuracy, balanced_accuracy, recall_score, precision_score) <br>
 `max_features`: Maximum number of features used for training (default: 1000)<br>
 `features_decrement`: Decrement step of features when a recursion error occurs. <br> If smaller then `1` this will be percentage based otherwise it will be an absolute value (default: 0.9) <br>
 `max_attempts`: Maximum number of attempts for training when failing due to a recursion error. (default: 5)<br>
-`train_time`: Time in minutes used for training the model. If not specified it uses the dynamic training time. (default: dynamic)<br>
-`evaluation_identifier`: Name of the dataset within your project, only used for evaluation. If specified, `dataset_identifier` only used for training.
+`train_time`: Time in minutes used for training the model (time for feature engineering is excluded). If not specified it uses the dynamic training time (between 2 and 30 Minutes). (default: dynamic)<br>
+`evaluation_identifier`: Name of the dataset within your project, only used for evaluation (test dataset). If specified, data from `dataset_identifier` is only used for training, instead of being used for train and test.
 
 
 ##### Example use
@@ -164,12 +173,12 @@ https://<URL to the AutoTiM-Service>/train?use_case_name=<use case>&dataset_iden
 
 ![Predict Workflow](doc/opensource_release/predict_workflow.png)
 
-The `/predict`-endpoint returns predictions from one or more given data points for the selected use case. By default, the model with the production flag is used, but the model version can be specified if required.
+The `/predict`-endpoint returns predictions from one or more given data points for the selected use case. By default, the model with the production flag is used, but the model version can be specified if needed.
 
 ##### Required parameters
 `use_case_name` (str): Name of the experiment / project <br>
 `dataset_identifier` (str): Name of the dataset within your project <br>
-`file`: csv-file containing one or more timeseries instances
+`file`: csv-file containing one or more time series instances for the prediction
 
 ##### Optional parameters
 `model_version` (int): Version of the model (as listed in MLFLow) to be used for prediction (default: production model)
@@ -190,7 +199,8 @@ can find it [here](doc/tutorial/README.md).
 
 ## 4. Troubleshooting
 
-To run the unittests, run `coverage run -m unittest`
+To run the unittests, run `coverage run -m unittest`  
+(You need to have *coverage* installed for this)
 
 ## 5. Project Organization
 
